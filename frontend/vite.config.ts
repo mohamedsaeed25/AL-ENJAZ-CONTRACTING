@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react-swc';
 
 export default defineConfig({
   plugins: [react()],
+  // مهم لـ GitHub Pages: اسم الريبو
+  base: '/AL-ENJAZ-CONTRACTING/',
   server: {
     port: 5173
   }
