@@ -368,7 +368,7 @@ export function App() {
     );
   }
 
-  if (error) {
+  if (error && !isDemo) {
     return (
       <div className="loading-screen">
         <p className="error">{error}</p>
