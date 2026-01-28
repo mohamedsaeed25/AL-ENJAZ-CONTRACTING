@@ -60,6 +60,7 @@ ChartJS.register(
 );
 
 export function App() {
+  const isDemo = (import.meta as any).env?.PROD;
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +150,92 @@ export function App() {
         setError(null);
       } catch (e) {
         console.error(e);
-        setError('حدث خطأ أثناء تحميل البيانات');
+        if (isDemo) {
+          // Demo mode for GitHub Pages (no backend)
+          const demoClients: Client[] = [{ id: 1, name: 'شركة التطوير العقاري' }];
+          const demoProjects: Project[] = [
+            {
+              id: 1,
+              code: 'PRJ-001',
+              name: 'برج سكني – المرحلة الأولى',
+              clientId: 1,
+              status: 'IN_PROGRESS',
+              progress: 35,
+              budget: 15000000,
+              location: 'القاهرة الجديدة',
+              client: demoClients[0]
+            }
+          ];
+          const demoSuppliers: Supplier[] = [
+            {
+              id: 1,
+              companyName: 'شركة مواد البناء المتحدة',
+              contactPerson: 'مسؤول المشتريات',
+              phone: '0500000000',
+              email: 'supplier@example.com',
+              materials: 'حديد، أسمنت، رمل',
+              paymentTerms: '30 يوم',
+              balance: 20000
+            }
+          ];
+          const demoEmployees: Employee[] = [
+            {
+              id: 1,
+              name: 'عامل تجريبي',
+              jobTitle: 'عامل موقع',
+              specialization: 'عمالة عامة',
+              dailyWage: 150,
+              phone: '0550000000',
+              projectName: demoProjects[0].name,
+              status: 'ACTIVE'
+            }
+          ];
+          const demoEquipment: Equipment[] = [
+            {
+              id: 1,
+              name: 'حفار صغير',
+              type: 'حفار',
+              dailyCost: 400,
+              maintenanceDate: '2026-01-15',
+              projectName: demoProjects[0].name,
+              status: 'IN_USE'
+            }
+          ];
+          const demoPayments: Payment[] = [
+            {
+              id: 1,
+              type: 'OUTGOING',
+              amount: 527,
+              date: '2026-03-01',
+              description: 'دفعة',
+              paymentMethod: 'CASH',
+              status: 'COMPLETED',
+              relatedParty: demoProjects[0].name
+            }
+          ];
+          const demoStatements: Statement[] = [
+            {
+              id: 1,
+              projectId: 1,
+              number: '11',
+              amount: 100000,
+              date: '2026-01-12',
+              description: 'مستخلص أول للمشروع',
+              status: 'PAID',
+              project: demoProjects[0]
+            }
+          ];
+          setClients(demoClients);
+          setProjects(demoProjects);
+          setSuppliers(demoSuppliers);
+          setEmployees(demoEmployees);
+          setEquipment(demoEquipment);
+          setPayments(demoPayments);
+          setStatements(demoStatements);
+          setError(null);
+        } else {
+          setError('حدث خطأ أثناء تحميل البيانات');
+        }
       } finally {
         setLoading(false);
       }
@@ -616,7 +702,7 @@ export function App() {
         ) : activePage === 'projects' ? (
           <ProjectsPage projects={projects} clients={clients} />
         ) : activePage === 'statements' ? (
-          <StatementsPage projects={projects} />
+          <StatementsPage projects={projects} statements={statements} onStatementsChange={setStatements} />
         ) : activePage === 'suppliers' ? (
           <SuppliersPage suppliers={suppliers} onSupplierCreated={(s) => setSuppliers((p) => [...p, s])} />
         ) : activePage === 'employees' ? (
@@ -1039,11 +1125,12 @@ function ProjectsPage({ projects, clients }: ProjectsPageProps) {
 
 type StatementsPageProps = {
   projects: Project[];
+  statements: Statement[];
+  onStatementsChange: (next: Statement[]) => void;
 };
 
-function StatementsPage({ projects }: StatementsPageProps) {
-  const [statements, setStatements] = useState<Statement[]>([]);
-  const [loading, setLoading] = useState(true);
+function StatementsPage({ projects, statements, onStatementsChange }: StatementsPageProps) {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Statement | null>(null);
@@ -1055,47 +1142,71 @@ function StatementsPage({ projects }: StatementsPageProps) {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'REVIEW' | 'PENDING' | 'PAID'>('REVIEW');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const data = await getStatements();
-        setStatements(data);
-        setError(null);
-      } catch (e) {
-        console.error(e);
-        setError('تعذر تحميل المستخلصات');
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, []);
+  // البيانات تأتي من App (وتكون Demo على GitHub Pages)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !number || !amount || !date) return;
     try {
       if (editing) {
-        const updated = await updateStatement(editing.id, {
-          projectId: Number(projectId),
-          number,
-          amount: Number(amount),
-          date,
-          description,
-          status
-        });
-        setStatements((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...updated } : s)));
+        if ((import.meta as any).env?.PROD) {
+          onStatementsChange(
+            statements.map((s) =>
+              s.id === editing.id
+                ? {
+                    ...s,
+                    projectId: Number(projectId),
+                    number,
+                    amount: Number(amount),
+                    date,
+                    description,
+                    status,
+                    project: projects.find((p) => p.id === Number(projectId)) ?? s.project
+                  }
+                : s
+            )
+          );
+        } else {
+          const updated = await updateStatement(editing.id, {
+            projectId: Number(projectId),
+            number,
+            amount: Number(amount),
+            date,
+            description,
+            status
+          });
+          onStatementsChange(
+            statements.map((s) => (s.id === editing.id ? { ...s, ...updated } : s))
+          );
+        }
       } else {
-        const created = await createStatement({
-          projectId: Number(projectId),
-          number,
-          amount: Number(amount),
-          date,
-          description,
-          status
-        });
-        setStatements((prev) => [...prev, created]);
+        if ((import.meta as any).env?.PROD) {
+          const nextId = Math.max(0, ...statements.map((s) => s.id)) + 1;
+          const proj = projects.find((p) => p.id === Number(projectId)) || null;
+          onStatementsChange([
+            ...statements,
+            {
+              id: nextId,
+              projectId: Number(projectId),
+              number,
+              amount: Number(amount),
+              date,
+              description,
+              status,
+              project: proj
+            }
+          ]);
+        } else {
+          const created = await createStatement({
+            projectId: Number(projectId),
+            number,
+            amount: Number(amount),
+            date,
+            description,
+            status
+          });
+          onStatementsChange([...statements, created]);
+        }
       }
       setShowModal(false);
       setEditing(null);
@@ -1114,8 +1225,10 @@ function StatementsPage({ projects }: StatementsPageProps) {
   const handleDelete = async (id: number) => {
     if (!confirm('هل تريد حذف هذا المستخلص؟')) return;
     try {
-      await deleteStatement(id);
-      setStatements((prev) => prev.filter((s) => s.id !== id));
+      if (!(import.meta as any).env?.PROD) {
+        await deleteStatement(id);
+      }
+      onStatementsChange(statements.filter((s) => s.id !== id));
     } catch (err) {
       console.error(err);
       alert('تعذر حذف المستخلص.');
